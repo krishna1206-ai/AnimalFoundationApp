@@ -12,7 +12,7 @@ type TypeFilter = 'all' | FormType;
 type StatusFilter = 'all' | SubmissionStatus;
 
 export default function SubmissionsScreen() {
-  const { submissions } = useApp();
+  const { submissions, refresh } = useApp();
   const [query, setQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
@@ -34,10 +34,10 @@ export default function SubmissionsScreen() {
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   }, [submissions, query, typeFilter, statusFilter]);
 
-  // Placeholder until the backend exists; this will re-fetch submissions.
+  // Pull to refresh: re-load requests from the database.
   const onRefresh = () => {
     setRefreshing(true);
-    setTimeout(() => setRefreshing(false), 800);
+    refresh().finally(() => setRefreshing(false));
   };
 
   return (

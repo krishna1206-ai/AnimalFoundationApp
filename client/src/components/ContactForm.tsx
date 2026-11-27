@@ -1,9 +1,17 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View, type TextInputProps } from 'react-native';
+import {
+  ActivityIndicator,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+  type TextInputProps,
+} from 'react-native';
 
 import { colors, radius, spacing } from '@/constants/theme';
-import { submitRequest, type FormType } from '@/utils/submit';
+import { submitRequest, type FormType, type SubmitResult } from '@/utils/submit';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -38,7 +46,9 @@ export function ContactForm() {
   const [subject, setSubject] = useState('');
   const [message, setMessage] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [sent, setSent] = useState(false);
+  const [sent, setSent] = useState<SubmitResult | null>(null);
+  const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState('');
 
   const isHelp = type === 'help';
 
@@ -52,16 +62,24 @@ export function ContactForm() {
     setErrors(e);
     if (Object.keys(e).length) return;
 
-    await submitRequest({
-      type,
-      name: name.trim(),
-      email: email.trim(),
-      phone: phone.trim() || undefined,
-      location: isHelp ? location.trim() || undefined : undefined,
-      subject: subject.trim(),
-      message: message.trim(),
-    });
-    setSent(true);
+    setSending(true);
+    setSendError('');
+    try {
+      const result = await submitRequest({
+        type,
+        name: name.trim(),
+        email: email.trim(),
+        phone: phone.trim() || undefined,
+        location: isHelp ? location.trim() || undefined : undefined,
+        subject: subject.trim(),
+        message: message.trim(),
+      });
+      setSent(result);
+    } catch {
+      setSendError("Sorry, your message couldn't be sent. Please check your connection and try again.");
+    } finally {
+      setSending(false);
+    }
   };
 
   const reset = () => {
@@ -72,7 +90,8 @@ export function ContactForm() {
     setSubject('');
     setMessage('');
     setErrors({});
-    setSent(false);
+    setSendError('');
+    setSent(null);
   };
 
   if (sent) {
@@ -83,7 +102,11 @@ export function ContactForm() {
         </View>
         <Text style={styles.sentTitle}>Thank you, {name.split(' ')[0]}!</Text>
         <Text style={styles.sentText}>
-          Your email app has opened with your message. Press send there and our team will get back to you.
+          {sent === 'saved'
+            ? isHelp
+              ? 'We have received your help request. Our team will contact you as soon as possible.'
+              : 'We have received your message. Our team will get back to you soon.'
+            : 'Your email app has opened with your message. Press send there and our team will get back to you.'}
         </Text>
         <Pressable onPress={reset} style={styles.secondaryBtn}>
           <Text style={styles.secondaryText}>Send another message</Text>
@@ -172,11 +195,19 @@ export function ContactForm() {
 
       <Pressable
         onPress={onSubmit}
-        style={({ pressed }) => [styles.submit, pressed && { opacity: 0.85 }]}
+        disabled={sending}
+        style={({ pressed }) => [styles.submit, (pressed || sending) && { opacity: 0.7 }]}
       >
-        <Ionicons name="send" size={16} color={colors.white} />
-        <Text style={styles.submitText}>Send message</Text>
+        {sending ? (
+          <ActivityIndicator color={colors.white} />
+        ) : (
+          <>
+            <Ionicons name="send" size={16} color={colors.white} />
+            <Text style={styles.submitText}>Send message</Text>
+          </>
+        )}
       </Pressable>
+      {sendError ? <Text style={[styles.error, styles.sendError]}>{sendError}</Text> : null}
     </View>
   );
 }
@@ -225,6 +256,7 @@ const styles = StyleSheet.create({
   multiline: { minHeight: 120, textAlignVertical: 'top' },
   inputError: { borderColor: colors.danger },
   error: { color: colors.danger, fontSize: 12, marginTop: 4 },
+  sendError: { textAlign: 'center', marginTop: spacing.md, fontSize: 13 },
   submit: {
     flexDirection: 'row',
     alignItems: 'center',

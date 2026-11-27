@@ -2,6 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { Redirect, router } from 'expo-router';
 import { useState } from 'react';
 import {
+  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -16,20 +17,32 @@ import { colors, radius, spacing } from '@/constants/theme';
 import { useApp } from '@/context/AppContext';
 
 export default function LoginScreen() {
-  const { isLoggedIn, login } = useApp();
+  const { ready, demoMode, isLoggedIn, login } = useApp();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
 
+  if (!ready) {
+    return (
+      <View style={[styles.safe, { alignItems: 'center', justifyContent: 'center' }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
+  }
   if (isLoggedIn) return <Redirect href="/" />;
 
-  const onSubmit = () => {
-    if (login(email, password)) {
+  const onSubmit = async () => {
+    if (busy) return;
+    setBusy(true);
+    const err = await login(email, password);
+    setBusy(false);
+    if (err) {
+      setError(err);
+    } else {
       setError('');
       router.replace('/');
-    } else {
-      setError('Please enter your email and password.');
     }
   };
 
@@ -78,11 +91,22 @@ export default function LoginScreen() {
           {error ? <Text style={styles.error}>{error}</Text> : null}
 
           <Pressable
-            style={({ pressed }) => [styles.button, pressed && { opacity: 0.85 }]}
+            style={({ pressed }) => [styles.button, (pressed || busy) && { opacity: 0.85 }]}
             onPress={onSubmit}
+            disabled={busy}
           >
-            <Text style={styles.buttonText}>Sign in</Text>
+            {busy ? (
+              <ActivityIndicator color={colors.white} />
+            ) : (
+              <Text style={styles.buttonText}>Sign in</Text>
+            )}
           </Pressable>
+
+          {demoMode ? (
+            <Text style={styles.demo}>
+              Demo mode: backend not connected, showing sample data. Any email and password works.
+            </Text>
+          ) : null}
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -128,4 +152,5 @@ const styles = StyleSheet.create({
     marginTop: spacing.xl,
   },
   buttonText: { color: colors.white, fontSize: 16, fontWeight: '700' },
+  demo: { color: colors.textMuted, fontSize: 12, textAlign: 'center', marginTop: spacing.lg, lineHeight: 18 },
 });
