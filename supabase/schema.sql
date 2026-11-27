@@ -57,3 +57,11 @@ create policy "users see own admin row" on public.admins
 do $$ begin
   alter publication supabase_realtime add table public.requests;
 exception when duplicate_object then null; end $$;
+
+-- Table access for the apps (newer Supabase projects don't grant this automatically).
+-- Row-level security above still decides WHICH rows each user can touch.
+grant usage on schema public to anon, authenticated;
+grant insert on public.requests to anon, authenticated;
+grant select, update, delete on public.requests to authenticated;
+grant select on public.admins to authenticated;
+grant execute on function public.is_admin() to authenticated;
